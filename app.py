@@ -107,6 +107,15 @@ class SignUpTr(StatesGroup):
     waiting_phone_number = State()
 
 
+def get_members(id_training):
+    training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''', (id_training,)).fetchone()
+    every = cur.execute('''SELECT * FROM user_to_training WHERE training_id = ?''', (id_training,)).fetchall()
+    res = training[1] + ', ' + str(training[2]) + '\nУчастники:\n'
+    for i in range(len(every)):
+        res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][5] + '\n'
+    return res, training[3]
+
+
 @dp.message_handler(commands=['start'], state='*')
 async def start_handler(message: types.Message, state: FSMContext):
     await state.finish()
@@ -283,8 +292,15 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%d.%m %H:%M')
         date_time = date_time.replace(year=2023)
-        cur.execute('''INSERT INTO Trainings(type_training, datetime) VALUES (?, ?)''',
-                    (data['chosen_type_training'], date_time))
+
+
+        # NOTIFICATION
+        msg = await bot.send_message(id_chat, str(data['chosen_type_training']) + ', ' + str(
+            date_time) + '\nУчастники: ')
+
+
+        cur.execute('''INSERT INTO Trainings(type_training, datetime, msg_id) VALUES (?, ?, ?)''',
+                    (data['chosen_type_training'], date_time, msg.message_id))
         con.commit()
         await bot.send_message(message.from_user.id, text=text_admin_successfully_add)
         await state.finish()
@@ -321,6 +337,27 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
         if not this_training:
             await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
             return
+        check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()
+        if check[3]:
+            cur.execute(
+                '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
+                (check[0], id_training, check[3], check[4], check[2]))
+            con.commit()
+
+            # NOTIFICATION
+            res, msg_id = get_members(id_training)
+            await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res)
+
+            await state.finish()
+            await bot.send_message(message.from_user.id, text_sign_up_successfully)
+            if message.from_user.id in admins:
+                btns = admin_menu_buttons
+            else:
+                btns = admin_menu_buttons
+            await bot.send_message(message.from_user.id,
+                                   text_menu_first + message.from_user.username + text_menu_second,
+                                   parse_mode='html', reply_markup=btns)
+            return
         await state.update_data(id_training=id_training)
         await state.set_state(SignUp.waiting_fi.state)
         await bot.send_message(message.from_user.id, text_sign_up_fi)
@@ -349,6 +386,13 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
             '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
             (user[0], data.get('id_training'), date_time, data.get('fi'), user[2]))
         con.commit()
+
+
+        # NOTIFICATION
+        res, msg_id = get_members(data.get('id_training'))
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res)
+
+
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_successfully)
         if message.from_user.id in admins:
@@ -430,6 +474,11 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
             (user_id, data.get('id_training'), date_time, data.get('fi'),
              data.get('phone_number')))
         con.commit()
+
+        # NOTIFICATION
+        res, msg_id = get_members(data.get('id_training'))
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res)
+
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_tr_successfully)
         await bot.send_message(message.from_user.id, text=text_admin_panel, reply_markup=panel)

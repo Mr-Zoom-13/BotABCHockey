@@ -210,7 +210,7 @@ async def refactor_training(call: types.CallbackQuery, state: FSMContext):
         menu_numbers.add(KeyboardButton(str(i[0])))
         res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
     await bot.send_message(call.from_user.id, text_admin_refactor_training + res,
-                           reply_markup=menu_numbers)
+                           reply_markup=menu_numbers, parse_mode='html')
 
 
 @dp.message_handler(state=RefactorTraining.waiting_id)
@@ -288,7 +288,7 @@ async def delete_training(call: types.CallbackQuery, state: FSMContext):
         menu_numbers.add(KeyboardButton(str(i[0])))
         res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
     await bot.send_message(call.from_user.id, text_admin_delete_training + res,
-                           reply_markup=menu_numbers)
+                           reply_markup=menu_numbers, parse_mode='html')
 
 
 @dp.message_handler(state=DeleteTraining.waiting_number)
@@ -320,12 +320,12 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
         date_time = date_time.replace(year=2023)
 
         # NOTIFICATION
-        msg = await bot.send_message(id_chat, str(data['chosen_type_training']) + ', ' + str(
-            date_time) + '\nУчастники: ')
+        msg = await bot.send_message(id_chat, '<b>' + data['chosen_type_training'] + '</b>' + ', ' + str(
+            date_time) + '\nУчастники: ', parse_mode='html')
 
         cur.execute(
             '''INSERT INTO Trainings(type_training, datetime, msg_id) VALUES (?, ?, ?)''',
-            (data['chosen_type_training'], date_time, msg.message_id))
+            ('<b>' + data['chosen_type_training'] + '</b>', date_time, msg.message_id))
         con.commit()
         await bot.send_message(message.from_user.id, text=text_admin_successfully_add)
         await state.finish()
@@ -354,7 +354,7 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
     for i in every:
         menu_numbers.add(KeyboardButton(str(i[0])))
         res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
-    await bot.send_message(call.from_user.id, text_sign_up + res, reply_markup=menu_numbers)
+    await bot.send_message(call.from_user.id, text_sign_up + res, reply_markup=menu_numbers, parse_mode='html')
 
 
 @dp.message_handler(state=SignUp.waiting_number)
@@ -385,7 +385,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
 
             # NOTIFICATION
             res, msg_id = get_members(id_training)
-            await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res)
+            await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res, parse_mode='html')
 
             await state.finish()
             await bot.send_message(message.from_user.id, text_sign_up_successfully,
@@ -443,7 +443,7 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
 
         # NOTIFICATION
         res, msg_id = get_members(data.get('id_training'))
-        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res)
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res, parse_mode='html')
 
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_successfully,
@@ -487,7 +487,7 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
                 menu_numbers.add(KeyboardButton(str(i[0])))
                 res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
             await bot.send_message(message.from_user.id, text_sign_up + res,
-                                   reply_markup=menu_numbers)
+                                   reply_markup=menu_numbers, parse_mode='html')
         else:
             await bot.send_message(message.from_user.id, text_register_retry)
             return
@@ -534,7 +534,7 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
 
         # NOTIFICATION
         res, msg_id = get_members(data.get('id_training'))
-        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res)
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res, parse_mode='html')
 
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_tr_successfully)

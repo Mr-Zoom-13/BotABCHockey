@@ -195,11 +195,15 @@ async def add_training(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='refactor tr')
 async def refactor_training(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(RefactorTraining.waiting_id.state)
+    await call.message.delete()
     res = ''
+    menu_numbers = ReplyKeyboardMarkup()
+    menu_numbers.add(KeyboardButton('Назад⬅️'))
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
+        menu_numbers.add(KeyboardButton(str(i[0])))
         res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
-    await call.message.edit_text(text_admin_refactor_training + res)
+    await bot.send_message(call.from_user.id, text_admin_refactor_training + res, reply_markup=menu_numbers)
 
 
 @dp.message_handler(state=RefactorTraining.waiting_id)
@@ -268,11 +272,15 @@ async def refactor_training_chosen_column_type(message: types.Message, state: FS
 @dp.callback_query_handler(text='delete tr')
 async def delete_training(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(DeleteTraining.waiting_number.state)
+    await call.message.delete()
     res = ''
+    menu_numbers = ReplyKeyboardMarkup()
+    menu_numbers.add(KeyboardButton('Назад⬅️'))
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
+        menu_numbers.add(KeyboardButton(str(i[0])))
         res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
-    await call.message.edit_text(text_admin_delete_training + res)
+    await bot.send_message(call.from_user.id, text_admin_delete_training + res, reply_markup=menu_numbers)
 
 
 @dp.message_handler(state=DeleteTraining.waiting_number)
@@ -462,10 +470,13 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
             await state.update_data(phone_number=check)
             await state.set_state(SignUpTr.waiting_number.state)
             res = ''
+            menu_numbers = ReplyKeyboardMarkup()
+            menu_numbers.add(KeyboardButton('Назад⬅️'))
             every = cur.execute('''SELECT * FROM Trainings''').fetchall()
             for i in every:
+                menu_numbers.add(KeyboardButton(str(i[0])))
                 res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
-            await bot.send_message(message.from_user.id, text_sign_up + res)
+            await bot.send_message(message.from_user.id, text_sign_up + res, reply_markup=menu_numbers)
         else:
             await bot.send_message(message.from_user.id, text_register_retry)
             return

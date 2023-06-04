@@ -338,6 +338,10 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
             return
         check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()
+        already_exists = cur.execute('''SELECT * FROM user_to_training WHERE user_id=? AND training_id=?''', (check[0], id_training)).fetchone()
+        if already_exists:
+            await bot.send_message(message.from_user.id, text_sign_up_already)
+            return
         if check[3]:
             cur.execute(
                 '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
@@ -471,7 +475,7 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
                               (message.from_user.id,)).fetchone()[0]
         cur.execute(
             '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
-            (user_id, data.get('id_training'), date_time, data.get('fi'),
+            (0, data.get('id_training'), date_time, data.get('fi'),
              data.get('phone_number')))
         con.commit()
 

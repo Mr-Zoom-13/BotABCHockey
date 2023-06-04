@@ -23,3 +23,4 @@ text_sign_up_born = 'Введите дату рождения в формате:
 text_sign_up_successfully = 'Вы успешно записались! Удачи на льду!'
 text_sign_up_tr = 'Введите номер телефона'
 text_sign_up_tr_successfully = 'Вы успешно записали человека'
+text_sign_up_already = 'Вы уже записаны на данную тренировку!'

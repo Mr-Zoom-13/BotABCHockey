@@ -67,6 +67,12 @@ menu_choose_type.row(button_choose_game, button_choose_complex).row(button_choos
 # RemoveKeyboardButton
 remove_keyboard = ReplyKeyboardRemove()
 
+# Button for notifications
+menu_notifications = InlineKeyboardMarkup(row_width=2)
+button_notifications = InlineKeyboardButton(text='Записаться на тренировку',
+                                            url="https://t.me/abchockeybot")
+menu_notifications.add(button_notifications)
+
 
 class AddTraining(StatesGroup):
     waiting_for_type_training = State()
@@ -117,6 +123,12 @@ async def start_handler(message: types.Message, state: FSMContext):
         await bot.send_message(message.from_user.id,
                                text_menu_first + message.from_user.username + text_menu_second,
                                parse_mode='html', reply_markup=btns)
+
+
+@dp.message_handler(commands=['p'])
+async def notifications(message: types.Message):
+    if message.from_user.id in admins:
+        await bot.send_message(id_channel, message.text[3:], reply_markup=menu_notifications)
 
 
 @dp.message_handler(state=Register.waiting_phone_number)
@@ -289,6 +301,7 @@ async def schedule_trainings(call: types.CallbackQuery):
         photo = open('schedule.jpg', 'rb')
         await call.message.answer_photo(photo=photo, reply_markup=back_button)
 
+
 @dp.callback_query_handler(text='sign up')
 async def sign_up(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(SignUp.waiting_number.state)
@@ -327,10 +340,14 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%Y.%m.%d')
-        user = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()
-        cur.execute('''UPDATE Users set fi = ?, birthday = ? WHERE tg_id = ?''', (data.get('fi'), date_time, message.from_user.id))
+        user = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
+                           (message.from_user.id,)).fetchone()
+        cur.execute('''UPDATE Users set fi = ?, birthday = ? WHERE tg_id = ?''',
+                    (data.get('fi'), date_time, message.from_user.id))
         con.commit()
-        cur.execute('''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''', (user[0], data.get('id_training'), date_time, data.get('fi'), user[2]))
+        cur.execute(
+            '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
+            (user[0], data.get('id_training'), date_time, data.get('fi'), user[2]))
         con.commit()
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_successfully)
@@ -345,12 +362,14 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
         await bot.send_message(message.from_user.id, text=text_admin_add_training_date_retry)
         return
 
+
 # ---------------------------ADMINS SIGN UP-----------------------------------
 
 @dp.callback_query_handler(text='sign up tr')
 async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(SignUpTr.waiting_phone_number.state)
     await call.message.edit_text(text_sign_up_tr)
+
 
 @dp.message_handler(state=SignUpTr.waiting_phone_number)
 async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
@@ -375,6 +394,7 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
         await bot.send_message(message.from_user.id, text_register_retry)
         return
 
+
 @dp.message_handler(state=SignUpTr.waiting_number)
 async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
     try:
@@ -390,6 +410,7 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
     except ValueError:
         await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
 
+
 @dp.message_handler(state=SignUpTr.waiting_fi)
 async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
     await state.update_data(fi=message.text)
@@ -402,8 +423,12 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%Y.%m.%d')
-        user_id = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()[0]
-        cur.execute('''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''', (user_id, data.get('id_training'), date_time, data.get('fi'), data.get('phone_number')))
+        user_id = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
+                              (message.from_user.id,)).fetchone()[0]
+        cur.execute(
+            '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
+            (user_id, data.get('id_training'), date_time, data.get('fi'),
+             data.get('phone_number')))
         con.commit()
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_tr_successfully)
@@ -411,6 +436,7 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
     except ValueError:
         await bot.send_message(message.from_user.id, text=text_admin_add_training_date_retry)
         return
+
 
 # ---------------------------ADMINS SIGN UP-----------------------------------
 

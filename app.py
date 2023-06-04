@@ -112,10 +112,20 @@ def get_members(id_training):
     every = cur.execute('''SELECT * FROM user_to_training WHERE training_id = ?''', (id_training,)).fetchall()
     res = training[1] + ', ' + str(training[2]) + '\nУчастники:\n'
     for i in range(len(every)):
-        res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][5] + '\n'
+        res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[0] +  ', ' + every[i][5] + '\n'
     return res, training[3]
 
-
+@dp.message_handler(text='Назад⬅️', state='*')
+async def back_func(message: types.Message, state: FSMContext ):
+    await bot.send_message(message.from_user.id, text_back, reply_markup=remove_keyboard)
+    await state.finish()
+    if message.from_user.id in admins:
+        btns = admin_menu_buttons
+    else:
+        btns = menu_buttons
+    await bot.send_message(message.from_user.id,
+                           text_menu_first + message.from_user.username + text_menu_second,
+                           parse_mode='html', reply_markup=btns)
 @dp.message_handler(commands=['start'], state='*')
 async def start_handler(message: types.Message, state: FSMContext):
     await state.finish()
@@ -321,11 +331,15 @@ async def schedule_trainings(call: types.CallbackQuery):
 @dp.callback_query_handler(text='sign up')
 async def sign_up(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(SignUp.waiting_number.state)
+    await call.message.delete()
     res = ''
+    menu_numbers = ReplyKeyboardMarkup()
+    menu_numbers.add(KeyboardButton('Назад⬅️'))
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
+        menu_numbers.add(KeyboardButton(str(i[0])))
         res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
-    await call.message.edit_text(text_sign_up + res)
+    await bot.send_message(call.from_user.id, text_sign_up + res, reply_markup=menu_numbers)
 
 
 @dp.message_handler(state=SignUp.waiting_number)
@@ -338,10 +352,13 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
             return
         check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()
-        already_exists = cur.execute('''SELECT * FROM user_to_training WHERE user_id=? AND training_id=?''', (check[0], id_training)).fetchone()
+        already_exists = cur.execute('''SELECT * FROM user_to_training WHERE user_id=? AND training_id=? AND fi = ?''', (check[0], id_training, check[4])).fetchone()
         if already_exists:
-            await bot.send_message(message.from_user.id, text_sign_up_already)
+            await state.update_data(id_training=id_training)
+            await state.set_state(SignUp.waiting_fi.state)
+            await bot.send_message(message.from_user.id, text_sign_up_fi)
             return
+
         if check[3]:
             cur.execute(
                 '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
@@ -353,7 +370,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res)
 
             await state.finish()
-            await bot.send_message(message.from_user.id, text_sign_up_successfully)
+            await bot.send_message(message.from_user.id, text_sign_up_successfully, reply_markup=remove_keyboard)
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
             else:
@@ -383,6 +400,20 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
         date_time = datetime.strptime(message.text, '%Y.%m.%d')
         user = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                            (message.from_user.id,)).fetchone()
+        already_exists = cur.execute(
+            '''SELECT * FROM user_to_training WHERE user_id=? AND training_id=? AND fi = ?''',
+            (user[0], data.get('id_training'), data.get('fi'))).fetchone()
+        if already_exists:
+            await bot.send_message(message.from_user.id, text_sign_up_already)
+            await state.finish()
+            if message.from_user.id in admins:
+                btns = admin_menu_buttons
+            else:
+                btns = menu_buttons
+            await bot.send_message(message.from_user.id,
+                                   text_menu_first + message.from_user.username + text_menu_second,
+                                   parse_mode='html', reply_markup=btns)
+            return
         cur.execute('''UPDATE Users set fi = ?, birthday = ? WHERE tg_id = ?''',
                     (data.get('fi'), date_time, message.from_user.id))
         con.commit()
@@ -398,7 +429,7 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
 
 
         await state.finish()
-        await bot.send_message(message.from_user.id, text_sign_up_successfully)
+        await bot.send_message(message.from_user.id, text_sign_up_successfully, reply_markup=remove_keyboard)
         if message.from_user.id in admins:
             btns = admin_menu_buttons
         else:
@@ -519,6 +550,10 @@ async def back_func(call: types.CallbackQuery):
         await call.message.edit_text(
             text_menu_first + call.from_user.username + text_menu_second, reply_markup=btns,
             parse_mode='html')
+
+
+
+
 
 
 if __name__ == "__main__":

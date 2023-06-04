@@ -5,6 +5,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from config import *
+from texts import *
 import logging
 from phonenumbers import carrier
 import phonenumbers
@@ -87,10 +88,24 @@ class Register(StatesGroup):
     waiting_phone_number = State()
 
 
+class SignUp(StatesGroup):
+    waiting_number = State()
+    waiting_fi = State()
+    waiting_born = State()
+
+
+class SignUpTr(StatesGroup):
+    waiting_number = State()
+    waiting_fi = State()
+    waiting_born = State()
+    waiting_phone_number = State()
+
+
 @dp.message_handler(commands=['start'], state='*')
 async def start_handler(message: types.Message, state: FSMContext):
     await state.finish()
-    check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()
+    check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
+                        (message.from_user.id,)).fetchone()
     if not check:
         await state.set_state(Register.waiting_phone_number.state)
         await bot.send_message(message.from_user.id, text_register, parse_mode='html')
@@ -103,24 +118,31 @@ async def start_handler(message: types.Message, state: FSMContext):
                                text_menu_first + message.from_user.username + text_menu_second,
                                parse_mode='html', reply_markup=btns)
 
+
 @dp.message_handler(state=Register.waiting_phone_number)
 async def refactor_training_chosen(message: types.Message, state: FSMContext):
     check = message.text
     if check[0] == '8':
         check = '+7' + check[1:]
-    if carrier._is_mobile(number_type(phonenumbers.parse(check))):
-        check = phonenumbers.format_number(phonenumbers.parse(check), phonenumbers.PhoneNumberFormat.INTERNATIONAL)
-        cur.execute('''INSERT INTO Users(tg_id, phone_number) VALUES (?, ?)''', (message.from_user.id, check))
-        con.commit()
-        await state.finish()
-        if message.from_user.id in admins:
-            btns = admin_menu_buttons
+    try:
+        if carrier._is_mobile(number_type(phonenumbers.parse(check))):
+            check = phonenumbers.format_number(phonenumbers.parse(check),
+                                               phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+            cur.execute('''INSERT INTO Users(tg_id, phone_number) VALUES (?, ?)''',
+                        (message.from_user.id, check))
+            con.commit()
+            await state.finish()
+            if message.from_user.id in admins:
+                btns = admin_menu_buttons
+            else:
+                btns = admin_menu_buttons
+            await bot.send_message(message.from_user.id,
+                                   text_menu_first + message.from_user.username + text_menu_second,
+                                   parse_mode='html', reply_markup=btns)
         else:
-            btns = admin_menu_buttons
-        await bot.send_message(message.from_user.id,
-                               text_menu_first + message.from_user.username + text_menu_second,
-                               parse_mode='html', reply_markup=btns)
-    else:
+            await bot.send_message(message.from_user.id, text_register_retry)
+            return
+    except:
         await bot.send_message(message.from_user.id, text_register_retry)
         return
 
@@ -206,7 +228,8 @@ async def refactor_training_chosen_column_type(message: types.Message, state: FS
     cur.execute('''UPDATE Trainings set type_training = ? WHERE id = ? ''',
                 (message.text, data.get('id_training')))
     con.commit()
-    await bot.send_message(message.from_user.id, text=text_admin_successfully_refactor, reply_markup=remove_keyboard)
+    await bot.send_message(message.from_user.id, text=text_admin_successfully_refactor,
+                           reply_markup=remove_keyboard)
     await state.finish()
     await bot.send_message(message.from_user.id, text=text_admin_panel, reply_markup=panel)
 
@@ -266,11 +289,130 @@ async def schedule_trainings(call: types.CallbackQuery):
         photo = open('schedule.jpg', 'rb')
         await call.message.answer_photo(photo=photo, reply_markup=back_button)
 
-
 @dp.callback_query_handler(text='sign up')
-async def schedule_trainings(call: types.CallbackQuery, state: FSMContext):
-    pass
+async def sign_up(call: types.CallbackQuery, state: FSMContext):
+    await state.set_state(SignUp.waiting_number.state)
+    res = ''
+    every = cur.execute('''SELECT * FROM Trainings''').fetchall()
+    for i in every:
+        res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
+    await call.message.edit_text(text_sign_up + res)
 
+
+@dp.message_handler(state=SignUp.waiting_number)
+async def sign_up_number_chosen(message: types.Message, state: FSMContext):
+    try:
+        id_training = int(message.text)
+        this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
+                                    (id_training,)).fetchone()
+        if not this_training:
+            await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
+            return
+        await state.update_data(id_training=id_training)
+        await state.set_state(SignUp.waiting_fi.state)
+        await bot.send_message(message.from_user.id, text_sign_up_fi)
+    except ValueError:
+        await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
+
+
+@dp.message_handler(state=SignUp.waiting_fi)
+async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
+    await state.update_data(fi=message.text)
+    await state.set_state(SignUp.waiting_born.state)
+    await bot.send_message(message.from_user.id, text_sign_up_born)
+
+
+@dp.message_handler(state=SignUp.waiting_born)
+async def sign_up_born_chosen(message: types.Message, state: FSMContext):
+    try:
+        data = await state.get_data()
+        date_time = datetime.strptime(message.text, '%Y.%m.%d')
+        user = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()
+        cur.execute('''UPDATE Users set fi = ?, birthday = ? WHERE tg_id = ?''', (data.get('fi'), date_time, message.from_user.id))
+        con.commit()
+        cur.execute('''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''', (user[0], data.get('id_training'), date_time, data.get('fi'), user[2]))
+        con.commit()
+        await state.finish()
+        await bot.send_message(message.from_user.id, text_sign_up_successfully)
+        if message.from_user.id in admins:
+            btns = admin_menu_buttons
+        else:
+            btns = admin_menu_buttons
+        await bot.send_message(message.from_user.id,
+                               text_menu_first + message.from_user.username + text_menu_second,
+                               parse_mode='html', reply_markup=btns)
+    except ValueError:
+        await bot.send_message(message.from_user.id, text=text_admin_add_training_date_retry)
+        return
+
+# ---------------------------ADMINS SIGN UP-----------------------------------
+
+@dp.callback_query_handler(text='sign up tr')
+async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
+    await state.set_state(SignUpTr.waiting_phone_number.state)
+    await call.message.edit_text(text_sign_up_tr)
+
+@dp.message_handler(state=SignUpTr.waiting_phone_number)
+async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
+    check = message.text
+    if check[0] == '8':
+        check = '+7' + check[1:]
+    try:
+        if carrier._is_mobile(number_type(phonenumbers.parse(check))):
+            check = phonenumbers.format_number(phonenumbers.parse(check),
+                                               phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+            await state.update_data(phone_number=check)
+            await state.set_state(SignUpTr.waiting_number.state)
+            res = ''
+            every = cur.execute('''SELECT * FROM Trainings''').fetchall()
+            for i in every:
+                res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
+            await bot.send_message(message.from_user.id, text_sign_up + res)
+        else:
+            await bot.send_message(message.from_user.id, text_register_retry)
+            return
+    except:
+        await bot.send_message(message.from_user.id, text_register_retry)
+        return
+
+@dp.message_handler(state=SignUpTr.waiting_number)
+async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
+    try:
+        id_training = int(message.text)
+        this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
+                                    (id_training,)).fetchone()
+        if not this_training:
+            await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
+            return
+        await state.update_data(id_training=id_training)
+        await state.set_state(SignUpTr.waiting_fi.state)
+        await bot.send_message(message.from_user.id, text_sign_up_fi)
+    except ValueError:
+        await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
+
+@dp.message_handler(state=SignUpTr.waiting_fi)
+async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
+    await state.update_data(fi=message.text)
+    await state.set_state(SignUpTr.waiting_born.state)
+    await bot.send_message(message.from_user.id, text_sign_up_born)
+
+
+@dp.message_handler(state=SignUpTr.waiting_born)
+async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
+    try:
+        data = await state.get_data()
+        date_time = datetime.strptime(message.text, '%Y.%m.%d')
+        user_id = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''', (message.from_user.id,)).fetchone()[0]
+        cur.execute('''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''', (user_id, data.get('id_training'), date_time, data.get('fi'), data.get('phone_number')))
+        con.commit()
+        await state.finish()
+        await bot.send_message(message.from_user.id, text_sign_up_tr_successfully)
+        await bot.send_message(message.from_user.id, text=text_admin_panel, reply_markup=panel)
+    except ValueError:
+        await bot.send_message(message.from_user.id, text=text_admin_add_training_date_retry)
+        return
+
+# ---------------------------ADMINS SIGN UP-----------------------------------
 
 @dp.callback_query_handler(text='contacts')
 async def get_contacts(call: types.CallbackQuery):

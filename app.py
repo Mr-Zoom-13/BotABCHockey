@@ -128,7 +128,7 @@ async def start_handler(message: types.Message, state: FSMContext):
         if message.from_user.id in admins:
             btns = admin_menu_buttons
         else:
-            btns = admin_menu_buttons
+            btns = menu_buttons
         await bot.send_message(message.from_user.id,
                                text_menu_first + message.from_user.username + text_menu_second,
                                parse_mode='html', reply_markup=btns)
@@ -156,7 +156,7 @@ async def refactor_training_chosen(message: types.Message, state: FSMContext):
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
             else:
-                btns = admin_menu_buttons
+                btns = menu_buttons
             await bot.send_message(message.from_user.id,
                                    text_menu_first + message.from_user.username + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
@@ -357,7 +357,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
             else:
-                btns = admin_menu_buttons
+                btns = menu_buttons
             await bot.send_message(message.from_user.id,
                                    text_menu_first + message.from_user.username + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
@@ -402,12 +402,12 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
         if message.from_user.id in admins:
             btns = admin_menu_buttons
         else:
-            btns = admin_menu_buttons
+            btns = menu_buttons
         await bot.send_message(message.from_user.id,
                                text_menu_first + message.from_user.username + text_menu_second,
                                parse_mode='html', reply_markup=btns)
     except ValueError:
-        await bot.send_message(message.from_user.id, text=text_admin_add_training_date_retry)
+        await bot.send_message(message.from_user.id, text=text_sign_up_retry)
         return
 
 
@@ -487,7 +487,7 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
         await bot.send_message(message.from_user.id, text_sign_up_tr_successfully)
         await bot.send_message(message.from_user.id, text=text_admin_panel, reply_markup=panel)
     except ValueError:
-        await bot.send_message(message.from_user.id, text=text_admin_add_training_date_retry)
+        await bot.send_message(message.from_user.id, text=text_sign_up_retry)
         return
 
 
@@ -510,7 +510,7 @@ async def back_func(call: types.CallbackQuery):
     if call.from_user.id in admins:
         btns = admin_menu_buttons
     else:
-        btns = admin_menu_buttons
+        btns = menu_buttons
     if call.message.photo or call.message.location:
         await call.message.delete()
         await call.message.answer(text_menu_first + call.from_user.username + text_menu_second,

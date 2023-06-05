@@ -112,7 +112,7 @@ def get_members(id_training):
                            (id_training,)).fetchone()
     every = cur.execute('''SELECT * FROM user_to_training WHERE training_id = ?''',
                         (id_training,)).fetchall()
-    res = training[1] + ', ' + str(training[2]) + '\nУчастники:\n'
+    res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
     for i in range(len(every)):
         res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
             0] + ', ' + every[i][5] + '\n'
@@ -208,7 +208,7 @@ async def refactor_training(call: types.CallbackQuery, state: FSMContext):
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
         menu_numbers.add(KeyboardButton(str(i[0])))
-        res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
+        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
     await bot.send_message(call.from_user.id, text_admin_refactor_training + res,
                            reply_markup=menu_numbers, parse_mode='html')
 
@@ -286,7 +286,8 @@ async def delete_training(call: types.CallbackQuery, state: FSMContext):
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
         menu_numbers.add(KeyboardButton(str(i[0])))
-        res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
+        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+
     await bot.send_message(call.from_user.id, text_admin_delete_training + res,
                            reply_markup=menu_numbers, parse_mode='html')
 
@@ -318,10 +319,10 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%d.%m %H:%M')
         date_time = date_time.replace(year=2023)
-
+        # res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
+        #     str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
         # NOTIFICATION
-        msg = await bot.send_message(id_chat, '<b>' + data['chosen_type_training'] + '</b>' + ', ' + str(
-            date_time) + '\nУчастники: ', parse_mode='html')
+        msg = await bot.send_message(id_chat, str(date_time).split(' ')[0] + ' <b>' + data['chosen_type_training'] + '</b> ' + ':'.join(str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
 
         cur.execute(
             '''INSERT INTO Trainings(type_training, datetime, msg_id) VALUES (?, ?, ?)''',
@@ -353,7 +354,8 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
         menu_numbers.add(KeyboardButton(str(i[0])))
-        res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
+        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+
     await bot.send_message(call.from_user.id, text_sign_up + res, reply_markup=menu_numbers, parse_mode='html')
 
 
@@ -485,7 +487,8 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
             every = cur.execute('''SELECT * FROM Trainings''').fetchall()
             for i in every:
                 menu_numbers.add(KeyboardButton(str(i[0])))
-                res += str(i[0]) + '. ' + str(i[1]) + ', ' + str(i[2]) + '\n'
+                res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+
             await bot.send_message(message.from_user.id, text_sign_up + res,
                                    reply_markup=menu_numbers, parse_mode='html')
         else:

@@ -112,7 +112,8 @@ def get_members(id_training):
                            (id_training,)).fetchone()
     every = cur.execute('''SELECT * FROM user_to_training WHERE training_id = ?''',
                         (id_training,)).fetchall()
-    res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
+    res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
+        str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
     for i in range(len(every)):
         res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
             0] + ', ' + every[i][5] + '\n'
@@ -128,7 +129,7 @@ async def back_func(message: types.Message, state: FSMContext):
     else:
         btns = menu_buttons
     await bot.send_message(message.from_user.id,
-                           text_menu_first + message.from_user.username + text_menu_second,
+                           text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                            parse_mode='html', reply_markup=btns)
 
 
@@ -146,7 +147,7 @@ async def start_handler(message: types.Message, state: FSMContext):
         else:
             btns = menu_buttons
         await bot.send_message(message.from_user.id,
-                               text_menu_first + message.from_user.username + text_menu_second,
+                               text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                parse_mode='html', reply_markup=btns)
 
 
@@ -174,7 +175,7 @@ async def refactor_training_chosen(message: types.Message, state: FSMContext):
             else:
                 btns = menu_buttons
             await bot.send_message(message.from_user.id,
-                                   text_menu_first + message.from_user.username + text_menu_second,
+                                   text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
         else:
             await bot.send_message(message.from_user.id, text_register_retry)
@@ -208,7 +209,8 @@ async def refactor_training(call: types.CallbackQuery, state: FSMContext):
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
         menu_numbers.add(KeyboardButton(str(i[0])))
-        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
+            i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
     await bot.send_message(call.from_user.id, text_admin_refactor_training + res,
                            reply_markup=menu_numbers, parse_mode='html')
 
@@ -286,7 +288,8 @@ async def delete_training(call: types.CallbackQuery, state: FSMContext):
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
         menu_numbers.add(KeyboardButton(str(i[0])))
-        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
+            i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
 
     await bot.send_message(call.from_user.id, text_admin_delete_training + res,
                            reply_markup=menu_numbers, parse_mode='html')
@@ -322,7 +325,9 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
         # res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
         #     str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
         # NOTIFICATION
-        msg = await bot.send_message(id_chat, str(date_time).split(' ')[0] + ' <b>' + data['chosen_type_training'] + '</b> ' + ':'.join(str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
+        msg = await bot.send_message(id_chat, str(date_time).split(' ')[0] + ' <b>' + data[
+            'chosen_type_training'] + '</b> ' + ':'.join(
+            str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
 
         cur.execute(
             '''INSERT INTO Trainings(type_training, datetime, msg_id) VALUES (?, ?, ?)''',
@@ -354,9 +359,11 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     for i in every:
         menu_numbers.add(KeyboardButton(str(i[0])))
-        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
+            i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
 
-    await bot.send_message(call.from_user.id, text_sign_up + res, reply_markup=menu_numbers, parse_mode='html')
+    await bot.send_message(call.from_user.id, text_sign_up + res, reply_markup=menu_numbers,
+                           parse_mode='html')
 
 
 @dp.message_handler(state=SignUp.waiting_number)
@@ -387,7 +394,8 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
 
             # NOTIFICATION
             res, msg_id = get_members(id_training)
-            await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res, parse_mode='html')
+            await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
+                                        parse_mode='html')
 
             await state.finish()
             await bot.send_message(message.from_user.id, text_sign_up_successfully,
@@ -397,7 +405,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             else:
                 btns = menu_buttons
             await bot.send_message(message.from_user.id,
-                                   text_menu_first + message.from_user.username + text_menu_second,
+                                   text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
             return
         await state.update_data(id_training=id_training)
@@ -432,7 +440,7 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
             else:
                 btns = menu_buttons
             await bot.send_message(message.from_user.id,
-                                   text_menu_first + message.from_user.username + text_menu_second,
+                                   text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
             return
         cur.execute('''UPDATE Users set fi = ?, birthday = ? WHERE tg_id = ?''',
@@ -445,7 +453,8 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
 
         # NOTIFICATION
         res, msg_id = get_members(data.get('id_training'))
-        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res, parse_mode='html')
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
+                                    parse_mode='html')
 
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_successfully,
@@ -455,7 +464,7 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
         else:
             btns = menu_buttons
         await bot.send_message(message.from_user.id,
-                               text_menu_first + message.from_user.username + text_menu_second,
+                               text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                parse_mode='html', reply_markup=btns)
     except ValueError:
         await bot.send_message(message.from_user.id, text=text_sign_up_retry)
@@ -487,7 +496,8 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
             every = cur.execute('''SELECT * FROM Trainings''').fetchall()
             for i in every:
                 menu_numbers.add(KeyboardButton(str(i[0])))
-                res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+                res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
+                    i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
 
             await bot.send_message(message.from_user.id, text_sign_up + res,
                                    reply_markup=menu_numbers, parse_mode='html')
@@ -537,7 +547,8 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
 
         # NOTIFICATION
         res, msg_id = get_members(data.get('id_training'))
-        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res, parse_mode='html')
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
+                                    parse_mode='html')
 
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_tr_successfully)
@@ -569,11 +580,13 @@ async def back_func(call: types.CallbackQuery):
         btns = menu_buttons
     if call.message.photo or call.message.location:
         await call.message.delete()
-        await call.message.answer(text_menu_first + call.from_user.username + text_menu_second,
-                                  reply_markup=btns, parse_mode='html')
+        await call.message.answer(
+            text_menu_first + call.from_user.first_name + ' ' + call.from_user.last_name + text_menu_second,
+            reply_markup=btns, parse_mode='html')
     else:
         await call.message.edit_text(
-            text_menu_first + call.from_user.username + text_menu_second, reply_markup=btns,
+            text_menu_first + call.from_user.first_name + ' ' + call.from_user.last_name + text_menu_second,
+            reply_markup=btns,
             parse_mode='html')
 
 

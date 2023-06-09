@@ -29,11 +29,11 @@ dp.message_handler(commands=['start'])
 # Menu
 menu_buttons = InlineKeyboardMarkup(row_width=2)
 admin_menu_buttons = InlineKeyboardMarkup(row_width=2)
-button_schedule = InlineKeyboardButton(text='Расписание тренировок📆', callback_data='schedule')
-button_sign_up = InlineKeyboardButton(text='Запись на тренировку🏒', callback_data='sign up')
+button_schedule = InlineKeyboardButton(text='Расписание📆', callback_data='schedule')
+button_sign_up = InlineKeyboardButton(text='Запись🏒', callback_data='sign up')
 button_contacts = InlineKeyboardButton(text='Контакты📞', callback_data='contacts')
 button_where = InlineKeyboardButton(text='Как добраться🚗', callback_data='where')
-button_admin_panel = InlineKeyboardButton(text='Админ-панель', callback_data='admin')
+button_admin_panel = InlineKeyboardButton(text='Админ-панель👑', callback_data='admin')
 admin_menu_buttons.row(button_schedule, button_sign_up).row(button_contacts, button_where).row(
     button_admin_panel)
 menu_buttons.row(button_schedule, button_sign_up).row(button_contacts, button_where)
@@ -44,12 +44,12 @@ back_button = InlineKeyboardMarkup(row_width=1).row(
 
 # Admin-panel
 panel = InlineKeyboardMarkup(row_width=2)
-button_add_training = InlineKeyboardButton(text='Добавить тренировку', callback_data='add tr')
-button_refactor_training = InlineKeyboardButton(text='Редактировать тренировку',
+button_add_training = InlineKeyboardButton(text='➕Добавить тренировку', callback_data='add tr')
+button_refactor_training = InlineKeyboardButton(text='✏️Редактировать тренировку',
                                                 callback_data='refactor tr')
-button_delete_training = InlineKeyboardButton(text='Удалить тренировку',
+button_delete_training = InlineKeyboardButton(text='➖Удалить тренировку',
                                               callback_data='delete tr')
-button_sign_up_other = InlineKeyboardButton(text='Записать на тренировку',
+button_sign_up_other = InlineKeyboardButton(text='📝Записать на тренировку',
                                             callback_data='sign up tr')
 panel.row(button_add_training, button_refactor_training).row(button_delete_training,
                                                              button_sign_up_other).row(
@@ -193,7 +193,10 @@ async def admin_func(call: types.CallbackQuery):
 
 @dp.callback_query_handler(text='add tr')
 async def add_training(call: types.CallbackQuery, state: FSMContext):
-    await call.message.delete()
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await call.message.answer(text_admin_add_training_type, parse_mode='html',
                               reply_markup=menu_choose_type)
     await state.set_state(AddTraining.waiting_for_type_training.state)
@@ -202,7 +205,10 @@ async def add_training(call: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(text='refactor tr')
 async def refactor_training(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(RefactorTraining.waiting_id.state)
-    await call.message.delete()
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     res = ''
     menu_numbers = ReplyKeyboardMarkup()
     menu_numbers.add(KeyboardButton('Назад⬅️'))
@@ -281,7 +287,10 @@ async def refactor_training_chosen_column_type(message: types.Message, state: FS
 @dp.callback_query_handler(text='delete tr')
 async def delete_training(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(DeleteTraining.waiting_number.state)
-    await call.message.delete()
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     res = ''
     menu_numbers = ReplyKeyboardMarkup()
     menu_numbers.add(KeyboardButton('Назад⬅️'))
@@ -343,7 +352,10 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='schedule')
 async def schedule_trainings(call: types.CallbackQuery):
-    await call.message.delete()
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     with open('schedule.jpg', 'rb') as photo:
         photo = open('schedule.jpg', 'rb')
         await call.message.answer_photo(photo=photo, reply_markup=back_button)
@@ -352,7 +364,10 @@ async def schedule_trainings(call: types.CallbackQuery):
 @dp.callback_query_handler(text='sign up')
 async def sign_up(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(SignUp.waiting_number.state)
-    await call.message.delete()
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     res = ''
     menu_numbers = ReplyKeyboardMarkup()
     menu_numbers.add(KeyboardButton('Назад⬅️'))
@@ -568,7 +583,10 @@ async def get_contacts(call: types.CallbackQuery):
 
 @dp.callback_query_handler(text='where')
 async def location(call: types.CallbackQuery):
-    await call.message.delete()
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await bot.send_location(call.from_user.id, 55.723572, 37.677364, reply_markup=back_button)
 
 
@@ -579,7 +597,10 @@ async def back_func(call: types.CallbackQuery):
     else:
         btns = menu_buttons
     if call.message.photo or call.message.location:
-        await call.message.delete()
+        try:
+            await call.message.delete()
+        except Exception:
+            pass
         await call.message.answer(
             text_menu_first + call.from_user.first_name + ' ' + call.from_user.last_name + text_menu_second,
             reply_markup=btns, parse_mode='html')

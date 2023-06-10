@@ -486,10 +486,11 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%d.%m %H:%M')
         date_time = date_time.replace(year=2023)
-        # res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
-        #     str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
+
         # NOTIFICATION
-        msg = await bot.send_message(id_chat, str(date_time).split(' ')[0] + ' <b>' + data[
+        morph = pymorphy2.MorphAnalyzer()
+        pm = morph.parse(date_time.strftime('%A'))[0]
+        msg = await bot.send_message(id_chat, '<b>' + pm.inflect({'accs'}).word.capitalize() + '</b> ' + str(date_time).split(' ')[0] + ' <b>' + data[
             'chosen_type_training'] + '</b> ' + ':'.join(
             str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
         # PRIVATE

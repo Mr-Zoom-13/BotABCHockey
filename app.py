@@ -29,6 +29,7 @@ dp.message_handler(commands=['start'])
 # Menu
 menu_buttons = InlineKeyboardMarkup(row_width=2)
 admin_menu_buttons = InlineKeyboardMarkup(row_width=2)
+trainer_menu_buttons = InlineKeyboardMarkup(row_width=2)
 button_schedule = InlineKeyboardButton(text='Расписание📆', callback_data='schedule')
 button_sign_up = InlineKeyboardButton(text='Запись🏒', callback_data='sign up')
 button_contacts = InlineKeyboardButton(text='Контакты📞', callback_data='contacts')
@@ -54,6 +55,11 @@ button_sign_up_other = InlineKeyboardButton(text='📝Записать на тр
 panel.row(button_add_training, button_refactor_training).row(button_delete_training,
                                                              button_sign_up_other).row(
     InlineKeyboardButton('Назад⬅️', callback_data='back'))
+
+# Trainer's buttons
+trainer_menu_buttons.row(button_schedule, button_sign_up).row(button_contacts,
+                                                              button_where).row(
+    button_sign_up_other)
 
 # Choose types of training
 menu_choose_type = ReplyKeyboardMarkup(row_width=2)
@@ -120,12 +126,24 @@ def get_members(id_training):
     return res, training[3]
 
 
+def check_banned(tg_id):
+    check = cur.execute('''SELECT * FROM Banned WHERE tg_id=?''', (tg_id,)).fetchone()
+    if check:
+        return True
+    return False
+
+
 @dp.message_handler(text='Назад⬅️', state='*')
 async def back_func(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     await bot.send_message(message.from_user.id, text_back, reply_markup=remove_keyboard)
     await state.finish()
     if message.from_user.id in admins:
         btns = admin_menu_buttons
+    elif message.from_user.id in trainers:
+        btns = trainer_menu_buttons
     else:
         btns = menu_buttons
     await bot.send_message(message.from_user.id,
@@ -135,6 +153,9 @@ async def back_func(message: types.Message, state: FSMContext):
 
 @dp.message_handler(commands=['start'], state='*')
 async def start_handler(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     await state.finish()
     check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                         (message.from_user.id,)).fetchone()
@@ -144,6 +165,8 @@ async def start_handler(message: types.Message, state: FSMContext):
     else:
         if message.from_user.id in admins:
             btns = admin_menu_buttons
+        elif message.from_user.id in trainers:
+            btns = trainer_menu_buttons
         else:
             btns = menu_buttons
         await bot.send_message(message.from_user.id,
@@ -151,14 +174,39 @@ async def start_handler(message: types.Message, state: FSMContext):
                                parse_mode='html', reply_markup=btns)
 
 
+@dp.message_handler(commands=['ban'])
+async def start_handler(message: types.Message):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
+    try:
+        tg_id = int(message.get_args())
+        if message.from_user.id in admins:
+            if tg_id in admins:
+                await bot.send_message(message.from_user.id, text_ban_error)
+            else:
+                cur.execute('''INSERT INTO Banned(tg_id) VALUES(?)''', (tg_id,))
+                con.commit()
+                await bot.send_message(message.from_user.id, text_ban_successfully)
+    except ValueError:
+        await bot.send_message(message.from_user.id, text_ban_retry)
+
+
+
 @dp.message_handler(commands=['p'])
 async def notifications(message: types.Message):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     if message.from_user.id in admins:
         await bot.send_message(id_channel, message.text[3:], reply_markup=menu_notifications)
 
 
 @dp.message_handler(state=Register.waiting_phone_number)
 async def refactor_training_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     check = message.text
     if check[0] == '8':
         check = '+7' + check[1:]
@@ -172,6 +220,8 @@ async def refactor_training_chosen(message: types.Message, state: FSMContext):
             await state.finish()
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
+            elif message.from_user.id in trainers:
+                btns = trainer_menu_buttons
             else:
                 btns = menu_buttons
             await bot.send_message(message.from_user.id,
@@ -187,12 +237,18 @@ async def refactor_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='admin')
 async def admin_func(call: types.CallbackQuery):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     await call.message.edit_text(text_admin_panel, parse_mode='html',
                                  reply_markup=panel)
 
 
 @dp.callback_query_handler(text='add tr')
 async def add_training(call: types.CallbackQuery, state: FSMContext):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     try:
         await call.message.delete()
     except Exception:
@@ -204,6 +260,9 @@ async def add_training(call: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(text='refactor tr')
 async def refactor_training(call: types.CallbackQuery, state: FSMContext):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     await state.set_state(RefactorTraining.waiting_id.state)
     try:
         await call.message.delete()
@@ -223,6 +282,9 @@ async def refactor_training(call: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(state=RefactorTraining.waiting_id)
 async def refactor_training_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         id_training = int(message.text)
         this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
@@ -243,6 +305,9 @@ async def refactor_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=RefactorTraining.waiting_column)
 async def refactor_training_chosen_column(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     if message.text == '1':
         await state.set_state(RefactorTraining.waiting_type.state)
         await bot.send_message(message.from_user.id, text_admin_refactor_training_type,
@@ -257,6 +322,9 @@ async def refactor_training_chosen_column(message: types.Message, state: FSMCont
 
 @dp.message_handler(state=RefactorTraining.waiting_date)
 async def refactor_training_chosen_column_date(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%d.%m %H:%M')
@@ -274,6 +342,9 @@ async def refactor_training_chosen_column_date(message: types.Message, state: FS
 
 @dp.message_handler(state=RefactorTraining.waiting_type)
 async def refactor_training_chosen_column_type(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     data = await state.get_data()
     cur.execute('''UPDATE Trainings set type_training = ? WHERE id = ? ''',
                 (message.text, data.get('id_training')))
@@ -286,6 +357,9 @@ async def refactor_training_chosen_column_type(message: types.Message, state: FS
 
 @dp.callback_query_handler(text='delete tr')
 async def delete_training(call: types.CallbackQuery, state: FSMContext):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     await state.set_state(DeleteTraining.waiting_number.state)
     try:
         await call.message.delete()
@@ -306,6 +380,9 @@ async def delete_training(call: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(state=DeleteTraining.waiting_number)
 async def delete_training_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         id_training = int(message.text)
         cur.execute('''DELETE FROM Trainings WHERE id = ?''', (id_training,))
@@ -319,6 +396,9 @@ async def delete_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=AddTraining.waiting_for_type_training)
 async def type_training_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     await state.update_data(chosen_type_training=message.text)
     await state.set_state(AddTraining.waiting_for_date_training.state)
     await bot.send_message(message.from_user.id, text=text_admin_add_training_date,
@@ -327,6 +407,9 @@ async def type_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=AddTraining.waiting_for_date_training)
 async def date_training_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%d.%m %H:%M')
@@ -352,17 +435,22 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='schedule')
 async def schedule_trainings(call: types.CallbackQuery):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     try:
         await call.message.delete()
     except Exception:
         pass
-    with open('schedule.jpg', 'rb') as photo:
-        photo = open('schedule.jpg', 'rb')
+    with open('static/img/schedule.jpg', 'rb') as photo:
         await call.message.answer_photo(photo=photo, reply_markup=back_button)
 
 
 @dp.callback_query_handler(text='sign up')
 async def sign_up(call: types.CallbackQuery, state: FSMContext):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     await state.set_state(SignUp.waiting_number.state)
     try:
         await call.message.delete()
@@ -383,6 +471,9 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(state=SignUp.waiting_number)
 async def sign_up_number_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         id_training = int(message.text)
         this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
@@ -417,6 +508,8 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
                                    reply_markup=remove_keyboard)
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
+            elif message.from_user.id in trainers:
+                btns = trainer_menu_buttons
             else:
                 btns = menu_buttons
             await bot.send_message(message.from_user.id,
@@ -432,6 +525,9 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=SignUp.waiting_fi)
 async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     await state.update_data(fi=message.text)
     await state.set_state(SignUp.waiting_born.state)
     await bot.send_message(message.from_user.id, text_sign_up_born)
@@ -439,6 +535,9 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=SignUp.waiting_born)
 async def sign_up_born_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%Y.%m.%d')
@@ -452,6 +551,8 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
             await state.finish()
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
+            elif message.from_user.id in trainers:
+                btns = trainer_menu_buttons
             else:
                 btns = menu_buttons
             await bot.send_message(message.from_user.id,
@@ -476,6 +577,8 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
                                reply_markup=remove_keyboard)
         if message.from_user.id in admins:
             btns = admin_menu_buttons
+        elif message.from_user.id in trainers:
+            btns = trainer_menu_buttons
         else:
             btns = menu_buttons
         await bot.send_message(message.from_user.id,
@@ -490,12 +593,18 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='sign up tr')
 async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     await state.set_state(SignUpTr.waiting_phone_number.state)
     await call.message.edit_text(text_sign_up_tr)
 
 
 @dp.message_handler(state=SignUpTr.waiting_phone_number)
 async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     check = message.text
     if check[0] == '8':
         check = '+7' + check[1:]
@@ -526,6 +635,9 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=SignUpTr.waiting_number)
 async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         id_training = int(message.text)
         this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
@@ -542,6 +654,9 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=SignUpTr.waiting_fi)
 async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     await state.update_data(fi=message.text)
     await state.set_state(SignUpTr.waiting_born.state)
     await bot.send_message(message.from_user.id, text_sign_up_born)
@@ -549,6 +664,9 @@ async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=SignUpTr.waiting_born)
 async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
     try:
         data = await state.get_data()
         date_time = datetime.strptime(message.text, '%Y.%m.%d')
@@ -577,23 +695,36 @@ async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='contacts')
 async def get_contacts(call: types.CallbackQuery):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     await call.message.edit_text(text_contacts, parse_mode='html',
                                  reply_markup=back_button)
 
 
 @dp.callback_query_handler(text='where')
 async def location(call: types.CallbackQuery):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     try:
         await call.message.delete()
     except Exception:
         pass
-    await bot.send_location(call.from_user.id, 55.723572, 37.677364, reply_markup=back_button)
+    with open('static/img/where.png', 'rb') as photo:
+        await bot.send_photo(call.from_user.id, photo, caption=text_address,
+                             reply_markup=back_button)
 
 
 @dp.callback_query_handler(text='back')
 async def back_func(call: types.CallbackQuery):
+    if check_banned(call.from_user.id):
+        await bot.send_message(call.from_user.id, text_banned)
+        return
     if call.from_user.id in admins:
         btns = admin_menu_buttons
+    elif call.from_user.id in trainers:
+        btns = trainer_menu_buttons
     else:
         btns = menu_buttons
     if call.message.photo or call.message.location:

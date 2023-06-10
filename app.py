@@ -409,7 +409,7 @@ async def delete_training_chosen(message: types.Message, state: FSMContext):
         id_training = int(message.text)
         cur.execute('''DELETE FROM Trainings WHERE id = ?''', (id_training,))
         con.commit()
-        await bot.send_message(message.from_user.id, text_admin_successfully_delete)
+        await bot.send_message(message.from_user.id, text_admin_successfully_delete, reply_markup=remove_keyboard)
         await state.finish()
         await bot.send_message(message.from_user.id, text=text_admin_panel, reply_markup=panel)
     except ValueError:
@@ -506,11 +506,16 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
         return
     try:
         data = await state.get_data()
+        now = data.get('date_chosen')
         this_training = cur.execute('''SELECT * FROM Trainings WHERE datetime = ?''',
-                                    (data.get('date_chosen') + ' ' + message.text + ':00',)).fetchone()
+                                    (now + ' ' + message.text + ':00',)).fetchone()
         if not this_training:
             await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
             return
+        res = text_sign_up_successfully + this_training[1] + datetime.strptime(now, '%Y-%m-%d').strftime('%d.%m.%Y') + ' в '
+        morph = pymorphy2.MorphAnalyzer()
+        pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
+        res += pm.inflect({'accs'}).word.capitalize() + ' в ' + message.text
         check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                             (message.from_user.id,)).fetchone()
         already_exists = cur.execute(
@@ -534,7 +539,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
                                         parse_mode='html')
 
             await state.finish()
-            await bot.send_message(message.from_user.id, text_sign_up_successfully,
+            await bot.send_message(message.from_user.id, res,
                                    reply_markup=remove_keyboard)
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
@@ -548,7 +553,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             return
         await state.update_data(id_training=this_training[0])
         await state.set_state(SignUp.waiting_fi.state)
-        await bot.send_message(message.from_user.id, text_sign_up_fi)
+        await bot.send_message(message.from_user.id, text_sign_up_fi, reply_markup=remove_keyboard)
     except ValueError:
         await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
 
@@ -558,24 +563,15 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return
-    await state.update_data(fi=message.text)
-    await state.set_state(SignUp.waiting_born.state)
-    await bot.send_message(message.from_user.id, text_sign_up_born)
-
-
-@dp.message_handler(state=SignUp.waiting_born)
-async def sign_up_born_chosen(message: types.Message, state: FSMContext):
-    if check_banned(message.from_user.id):
-        await bot.send_message(message.from_user.id, text_banned)
-        return
     try:
+        fi = ' '.join(message.text.split()[:2])
         data = await state.get_data()
-        date_time = datetime.strptime(message.text, '%Y.%m.%d')
+        date_time = datetime.strptime(message.text.split()[-1], '%y')
         user = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                            (message.from_user.id,)).fetchone()
         already_exists = cur.execute(
             '''SELECT * FROM user_to_training WHERE user_id=? AND training_id=? AND fi = ?''',
-            (user[0], data.get('id_training'), data.get('fi'))).fetchone()
+            (user[0], data.get('id_training'), fi)).fetchone()
         if already_exists:
             await bot.send_message(message.from_user.id, text_sign_up_already)
             await state.finish()
@@ -589,21 +585,27 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
                                    text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
             return
-        cur.execute('''UPDATE Users set fi = ?, birthday = ? WHERE tg_id = ?''',
-                    (data.get('fi'), date_time, message.from_user.id))
-        con.commit()
+        if not user[4]:
+            cur.execute('''UPDATE Users set fi = ?, birthday = ? WHERE tg_id = ?''',
+                        (fi, date_time, message.from_user.id))
+            con.commit()
         cur.execute(
             '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
-            (user[0], data.get('id_training'), date_time, data.get('fi'), user[2]))
+            (user[0], data.get('id_training'), date_time, fi, user[2]))
         con.commit()
 
         # NOTIFICATION
         res, msg_id = get_members(data.get('id_training'))
         await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
                                     parse_mode='html')
-
+        this_training = cur.execute('''SELECT * FROM Trainings WHERE id=?''', (data.get('id_training'),)).fetchone()
+        now = data.get('date_chosen')
+        res = text_sign_up_successfully + this_training[1] + datetime.strptime(now, '%Y-%m-%d').strftime('%d.%m.%Y') + ' в '
+        morph = pymorphy2.MorphAnalyzer()
+        pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
+        res += pm.inflect({'accs'}).word.capitalize() + ' в ' + message.text
         await state.finish()
-        await bot.send_message(message.from_user.id, text_sign_up_successfully,
+        await bot.send_message(message.from_user.id, res,
                                reply_markup=remove_keyboard)
         if message.from_user.id in admins:
             btns = admin_menu_buttons
@@ -617,7 +619,6 @@ async def sign_up_born_chosen(message: types.Message, state: FSMContext):
     except ValueError:
         await bot.send_message(message.from_user.id, text=text_sign_up_retry)
         return
-
 
 # ---------------------------ADMINS SIGN UP-----------------------------------
 
@@ -653,7 +654,7 @@ async def sign_up_tr_phone_number_chosen(message: types.Message, state: FSMConte
                 res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
                     i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
 
-            await bot.send_message(message.from_user.id, text_sign_up + res,
+            await bot.send_message(message.from_user.id, text_sign_up + ':\n' + res,
                                    reply_markup=menu_numbers, parse_mode='html')
         else:
             await bot.send_message(message.from_user.id, text_register_retry)
@@ -687,24 +688,15 @@ async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return
-    await state.update_data(fi=message.text)
-    await state.set_state(SignUpTr.waiting_born.state)
-    await bot.send_message(message.from_user.id, text_sign_up_born)
-
-
-@dp.message_handler(state=SignUpTr.waiting_born)
-async def sign_up_tr_born_chosen(message: types.Message, state: FSMContext):
-    if check_banned(message.from_user.id):
-        await bot.send_message(message.from_user.id, text_banned)
-        return
     try:
+        fi = ' '.join(message.text.split()[:2])
         data = await state.get_data()
-        date_time = datetime.strptime(message.text, '%Y.%m.%d')
+        date_time = datetime.strptime(message.text.split()[-1], '%y')
         user_id = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                               (message.from_user.id,)).fetchone()[0]
         cur.execute(
             '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
-            (0, data.get('id_training'), date_time, data.get('fi'),
+            (0, data.get('id_training'), date_time, fi,
              data.get('phone_number')))
         con.commit()
 

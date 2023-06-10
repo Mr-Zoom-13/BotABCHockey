@@ -12,6 +12,13 @@ import phonenumbers
 from phonenumbers.phonenumberutil import number_type
 from datetime import datetime
 import sqlite3
+import locale
+import pymorphy2
+
+
+# Settings for Russian days of week
+locale.setlocale(locale.LC_ALL, '')
+
 
 # Logging for check
 logging.basicConfig(level=logging.INFO)
@@ -175,7 +182,7 @@ async def start_handler(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(commands=['ban'])
-async def start_handler(message: types.Message):
+async def ban_handler(message: types.Message):
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return
@@ -188,6 +195,21 @@ async def start_handler(message: types.Message):
                 cur.execute('''INSERT INTO Banned(tg_id) VALUES(?)''', (tg_id,))
                 con.commit()
                 await bot.send_message(message.from_user.id, text_ban_successfully)
+    except ValueError:
+        await bot.send_message(message.from_user.id, text_ban_retry)
+
+
+@dp.message_handler(commands=['unban'])
+async def unban_handler(message: types.Message):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned)
+        return
+    try:
+        tg_id = int(message.get_args())
+        if message.from_user.id in admins:
+            cur.execute('''DELETE FROM Banned WHERE tg_id=?''', (tg_id,))
+            con.commit()
+            await bot.send_message(message.from_user.id, text_unban_successfully)
     except ValueError:
         await bot.send_message(message.from_user.id, text_ban_retry)
 
@@ -456,17 +478,25 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
         await call.message.delete()
     except Exception:
         pass
-    res = ''
+    res = text_sign_up
     menu_numbers = ReplyKeyboardMarkup()
     menu_numbers.add(KeyboardButton('Назад⬅️'))
-    every = cur.execute('''SELECT * FROM Trainings''').fetchall()
-    for i in every:
-        menu_numbers.add(KeyboardButton(str(i[0])))
-        res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
-            i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
-
-    await bot.send_message(call.from_user.id, text_sign_up + res, reply_markup=menu_numbers,
-                           parse_mode='html')
+    every = cur.execute('''SELECT * FROM Trainings ORDER BY datetime''').fetchall()
+    if every:
+        now = every[0][2].split()[0]
+        await state.update_data(date_chosen=now)
+        res += datetime.strptime(now, '%Y-%m-%d').strftime('%d.%m.%Y')
+        morph = pymorphy2.MorphAnalyzer()
+        pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
+        res += ' в ' + pm.inflect({'accs'}).word.capitalize() + text_sign_up_2
+        for i in every:
+            if i[2].split()[0] == now:
+                menu_numbers.add(KeyboardButton(i[2].split()[1][:-3]))
+                res += i[2].split()[1][:-3] + ' ' + i[1] + '\n'
+            else:
+                break
+        await bot.send_message(call.from_user.id, res, reply_markup=menu_numbers,
+                               parse_mode='html')
 
 
 @dp.message_handler(state=SignUp.waiting_number)
@@ -475,9 +505,9 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
         await bot.send_message(message.from_user.id, text_banned)
         return
     try:
-        id_training = int(message.text)
-        this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
-                                    (id_training,)).fetchone()
+        data = await state.get_data()
+        this_training = cur.execute('''SELECT * FROM Trainings WHERE datetime = ?''',
+                                    (data.get('date_chosen') + ' ' + message.text + ':00',)).fetchone()
         if not this_training:
             await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
             return
@@ -485,9 +515,9 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
                             (message.from_user.id,)).fetchone()
         already_exists = cur.execute(
             '''SELECT * FROM user_to_training WHERE user_id=? AND training_id=? AND fi = ?''',
-            (check[0], id_training, check[4])).fetchone()
+            (check[0], this_training[0], check[4])).fetchone()
         if already_exists:
-            await state.update_data(id_training=id_training)
+            await state.update_data(id_training=this_training[0])
             await state.set_state(SignUp.waiting_fi.state)
             await bot.send_message(message.from_user.id, text_sign_up_fi)
             return
@@ -495,11 +525,11 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
         if check[3]:
             cur.execute(
                 '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
-                (check[0], id_training, check[3], check[4], check[2]))
+                (check[0], this_training[0], check[3], check[4], check[2]))
             con.commit()
 
             # NOTIFICATION
-            res, msg_id = get_members(id_training)
+            res, msg_id = get_members(this_training[0])
             await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
                                         parse_mode='html')
 
@@ -516,7 +546,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
                                    text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
             return
-        await state.update_data(id_training=id_training)
+        await state.update_data(id_training=this_training[0])
         await state.set_state(SignUp.waiting_fi.state)
         await bot.send_message(message.from_user.id, text_sign_up_fi)
     except ValueError:
@@ -601,7 +631,7 @@ async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
 
 
 @dp.message_handler(state=SignUpTr.waiting_phone_number)
-async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
+async def sign_up_tr_phone_number_chosen(message: types.Message, state: FSMContext):
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return

@@ -15,10 +15,8 @@ import sqlite3
 import locale
 import pymorphy2
 
-
 # Settings for Russian days of week
 locale.setlocale(locale.LC_ALL, '')
-
 
 # Logging for check
 logging.basicConfig(level=logging.INFO)
@@ -173,6 +171,8 @@ async def back_func(message: types.Message, state: FSMContext):
 
 @dp.message_handler(commands=['start'], state='*')
 async def start_handler(message: types.Message, state: FSMContext):
+    await bot.send_message(id_tech_chat, '[' + str(
+        message.from_user.id) + '] ' + message.from_user.first_name + ' ' + message.from_user.last_name + ': Команда /start')
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return
@@ -196,6 +196,8 @@ async def start_handler(message: types.Message, state: FSMContext):
 
 @dp.message_handler(commands=['ban'])
 async def ban_handler(message: types.Message):
+    await bot.send_message(id_tech_chat, '[' + str(
+        message.from_user.id) + '] ' + message.from_user.first_name + ' ' + message.from_user.last_name + ': Команда /ban')
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return
@@ -214,6 +216,8 @@ async def ban_handler(message: types.Message):
 
 @dp.message_handler(commands=['unban'])
 async def unban_handler(message: types.Message):
+    await bot.send_message(id_tech_chat, '[' + str(
+        message.from_user.id) + '] ' + message.from_user.first_name + ' ' + message.from_user.last_name + ': Команда /unban')
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return
@@ -229,14 +233,18 @@ async def unban_handler(message: types.Message):
 
 @dp.message_handler(commands=['del'])
 async def delete_member_handler(message: types.Message):
+    await bot.send_message(id_tech_chat, '[' + str(
+        message.from_user.id) + '] ' + message.from_user.first_name + ' ' + message.from_user.last_name + ': Команда /del')
     if message.from_user.id in admins:
         my_args = message.get_args()
         fi = ' '.join(my_args.split()[:2])
         birthday = datetime.strptime(my_args.split()[2], '%y')
         type_training = ' '.join(my_args.split()[3:])
-        every = cur.execute('''SELECT * FROM user_to_training WHERE fi = ? AND birthday = ?''', (fi, birthday)).fetchall()
+        every = cur.execute('''SELECT * FROM user_to_training WHERE fi = ? AND birthday = ?''',
+                            (fi, birthday)).fetchall()
         for i in every:
-            this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''', (i[2],)).fetchone()
+            this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
+                                        (i[2],)).fetchone()
             if this_training[1] == ('<b>' + type_training + '</b>'):
                 cur.execute('''DELETE FROM user_to_training WHERE id = ?''', (i[0],))
                 con.commit()
@@ -246,9 +254,10 @@ async def delete_member_handler(message: types.Message):
         await bot.send_message(message.from_user.id, text_delete_member_successfully)
 
 
-
 @dp.message_handler(commands=['p'])
 async def notifications(message: types.Message):
+    await bot.send_message(id_tech_chat, '[' + str(
+        message.from_user.id) + '] ' + message.from_user.first_name + ' ' + message.from_user.last_name + ': Команда /p')
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned)
         return
@@ -291,6 +300,8 @@ async def refactor_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='admin')
 async def admin_func(call: types.CallbackQuery):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Открыл админ-панель')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -300,6 +311,8 @@ async def admin_func(call: types.CallbackQuery):
 
 @dp.callback_query_handler(text='add tr')
 async def add_training(call: types.CallbackQuery, state: FSMContext):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Начал добавлять тренировку')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -314,6 +327,8 @@ async def add_training(call: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(text='refactor tr')
 async def refactor_training(call: types.CallbackQuery, state: FSMContext):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Начал изменять тренировку')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -411,6 +426,8 @@ async def refactor_training_chosen_column_type(message: types.Message, state: FS
 
 @dp.callback_query_handler(text='delete tr')
 async def delete_training(call: types.CallbackQuery, state: FSMContext):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Начал удалять тренировку')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -441,7 +458,8 @@ async def delete_training_chosen(message: types.Message, state: FSMContext):
         id_training = int(message.text)
         cur.execute('''DELETE FROM Trainings WHERE id = ?''', (id_training,))
         con.commit()
-        await bot.send_message(message.from_user.id, text_admin_successfully_delete, reply_markup=remove_keyboard)
+        await bot.send_message(message.from_user.id, text_admin_successfully_delete,
+                               reply_markup=remove_keyboard)
         await state.finish()
         await bot.send_message(message.from_user.id, text=text_admin_panel, reply_markup=panel)
     except ValueError:
@@ -475,13 +493,16 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
             'chosen_type_training'] + '</b> ' + ':'.join(
             str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
         # PRIVATE
-        pr_msg = await bot.send_message(id_private_chat, str(date_time).split(' ')[0] + ' <b>' + data[
-            'chosen_type_training'] + '</b> ' + ':'.join(
-            str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
+        pr_msg = await bot.send_message(id_private_chat,
+                                        str(date_time).split(' ')[0] + ' <b>' + data[
+                                            'chosen_type_training'] + '</b> ' + ':'.join(
+                                            str(date_time).split(' ')[1].split(':')[
+                                            :-1]) + '\nУчастники: ', parse_mode='html')
 
         cur.execute(
             '''INSERT INTO Trainings(type_training, datetime, msg_id, pr_msg_id) VALUES (?, ?, ?, ?)''',
-            ('<b>' + data['chosen_type_training'] + '</b>', date_time, msg.message_id, pr_msg.message_id))
+            ('<b>' + data['chosen_type_training'] + '</b>', date_time, msg.message_id,
+             pr_msg.message_id))
         con.commit()
         await bot.send_message(message.from_user.id, text=text_admin_successfully_add)
         await state.finish()
@@ -493,6 +514,8 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='schedule')
 async def schedule_trainings(call: types.CallbackQuery):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Посмотрел расписание')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -506,6 +529,8 @@ async def schedule_trainings(call: types.CallbackQuery):
 
 @dp.callback_query_handler(text='sign up')
 async def sign_up(call: types.CallbackQuery, state: FSMContext):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Начал записываться на тренировку')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -577,7 +602,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
 
             await state.finish()
             res = text_sign_up_successfully + this_training[1] + ' ' + datetime.strptime(now,
-                                                                                   '%Y-%m-%d').strftime(
+                                                                                         '%Y-%m-%d').strftime(
                 '%d.%m.%Y') + ' в '
             morph = pymorphy2.MorphAnalyzer()
             pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
@@ -597,7 +622,8 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
         await state.update_data(time_training=message.text)
         await state.update_data(id_training=this_training[0])
         await state.set_state(SignUp.waiting_fi.state)
-        await bot.send_message(message.from_user.id, text_sign_up_fi, reply_markup=remove_keyboard)
+        await bot.send_message(message.from_user.id, text_sign_up_fi,
+                               reply_markup=remove_keyboard)
     except ValueError:
         await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
 
@@ -646,9 +672,12 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
         res, msg_id = get_members_private(data.get('id_training'))
         await bot.edit_message_text(message_id=msg_id, chat_id=id_private_chat, text=res,
                                     parse_mode='html')
-        this_training = cur.execute('''SELECT * FROM Trainings WHERE id=?''', (data.get('id_training'),)).fetchone()
+        this_training = cur.execute('''SELECT * FROM Trainings WHERE id=?''',
+                                    (data.get('id_training'),)).fetchone()
         now = data.get('date_chosen')
-        res2 = text_sign_up_successfully + this_training[1] + ' ' + datetime.strptime(now, '%Y-%m-%d').strftime('%d.%m.%Y') + ' в '
+        res2 = text_sign_up_successfully + this_training[1] + ' ' + datetime.strptime(now,
+                                                                                      '%Y-%m-%d').strftime(
+            '%d.%m.%Y') + ' в '
         morph = pymorphy2.MorphAnalyzer()
         pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
         res2 += pm.inflect({'accs'}).word.capitalize() + ' в ' + data.get('time_training')
@@ -668,10 +697,13 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
         await bot.send_message(message.from_user.id, text=text_sign_up_retry)
         return
 
+
 # ---------------------------ADMINS SIGN UP-----------------------------------
 
 @dp.callback_query_handler(text='sign up tr')
 async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Администратор начал записывать на тренировку')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -767,6 +799,8 @@ async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='contacts')
 async def get_contacts(call: types.CallbackQuery):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Открыл контакты')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
@@ -776,6 +810,8 @@ async def get_contacts(call: types.CallbackQuery):
 
 @dp.callback_query_handler(text='where')
 async def location(call: types.CallbackQuery):
+    await bot.send_message(id_tech_chat, '[' + str(
+        call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Открыл местоположение')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return

@@ -129,8 +129,21 @@ def get_members(id_training):
         str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
     for i in range(len(every)):
         res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
-            0] + ', ' + every[i][5] + '\n'
+            0] + '\n'
     return res, training[3]
+
+
+def get_members_private(id_training):
+    training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
+                           (id_training,)).fetchone()
+    every = cur.execute('''SELECT * FROM user_to_training WHERE training_id = ?''',
+                        (id_training,)).fetchall()
+    res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
+        str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
+    for i in range(len(every)):
+        res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
+            0] + ', ' + every[i][5] + '\n'
+    return res, training[4]
 
 
 def check_banned(tg_id):
@@ -212,6 +225,25 @@ async def unban_handler(message: types.Message):
             await bot.send_message(message.from_user.id, text_unban_successfully)
     except ValueError:
         await bot.send_message(message.from_user.id, text_ban_retry)
+
+
+@dp.message_handler(commands=['del'])
+async def delete_member_handler(message: types.Message):
+    if message.from_user.id in admins:
+        my_args = message.get_args()
+        fi = ' '.join(my_args.split()[:2])
+        birthday = datetime.strptime(my_args.split()[2], '%y')
+        type_training = ' '.join(my_args.split()[3:])
+        every = cur.execute('''SELECT * FROM user_to_training WHERE fi = ? AND birthday = ?''', (fi, birthday)).fetchall()
+        for i in every:
+            this_training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''', (i[2],)).fetchone()
+            if this_training[1] == ('<b>' + type_training + '</b>'):
+                cur.execute('''DELETE FROM user_to_training WHERE id = ?''', (i[0],))
+                con.commit()
+                res, msg_id = get_members(i[2])
+                await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
+                                            parse_mode='html')
+        await bot.send_message(message.from_user.id, text_delete_member_successfully)
 
 
 
@@ -442,10 +474,14 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
         msg = await bot.send_message(id_chat, str(date_time).split(' ')[0] + ' <b>' + data[
             'chosen_type_training'] + '</b> ' + ':'.join(
             str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
+        # PRIVATE
+        pr_msg = await bot.send_message(id_private_chat, str(date_time).split(' ')[0] + ' <b>' + data[
+            'chosen_type_training'] + '</b> ' + ':'.join(
+            str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
 
         cur.execute(
-            '''INSERT INTO Trainings(type_training, datetime, msg_id) VALUES (?, ?, ?)''',
-            ('<b>' + data['chosen_type_training'] + '</b>', date_time, msg.message_id))
+            '''INSERT INTO Trainings(type_training, datetime, msg_id, pr_msg_id) VALUES (?, ?, ?, ?)''',
+            ('<b>' + data['chosen_type_training'] + '</b>', date_time, msg.message_id, pr_msg.message_id))
         con.commit()
         await bot.send_message(message.from_user.id, text=text_admin_successfully_add)
         await state.finish()
@@ -512,10 +548,6 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
         if not this_training:
             await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
             return
-        res = text_sign_up_successfully + this_training[1] + datetime.strptime(now, '%Y-%m-%d').strftime('%d.%m.%Y') + ' в '
-        morph = pymorphy2.MorphAnalyzer()
-        pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
-        res += pm.inflect({'accs'}).word.capitalize() + ' в ' + message.text
         check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                             (message.from_user.id,)).fetchone()
         already_exists = cur.execute(
@@ -538,9 +570,20 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
                                         parse_mode='html')
 
+            # PRIVATE
+            res, msg_id = get_members_private(this_training[0])
+            await bot.edit_message_text(message_id=msg_id, chat_id=id_private_chat, text=res,
+                                        parse_mode='html')
+
             await state.finish()
+            res = text_sign_up_successfully + this_training[1] + ' ' + datetime.strptime(now,
+                                                                                   '%Y-%m-%d').strftime(
+                '%d.%m.%Y') + ' в '
+            morph = pymorphy2.MorphAnalyzer()
+            pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
+            res += pm.inflect({'accs'}).word.capitalize() + ' в ' + message.text
             await bot.send_message(message.from_user.id, res,
-                                   reply_markup=remove_keyboard)
+                                   reply_markup=remove_keyboard, parse_mode='html')
             if message.from_user.id in admins:
                 btns = admin_menu_buttons
             elif message.from_user.id in trainers:
@@ -551,6 +594,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
                                    text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
             return
+        await state.update_data(time_training=message.text)
         await state.update_data(id_training=this_training[0])
         await state.set_state(SignUp.waiting_fi.state)
         await bot.send_message(message.from_user.id, text_sign_up_fi, reply_markup=remove_keyboard)
@@ -598,15 +642,19 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
         res, msg_id = get_members(data.get('id_training'))
         await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
                                     parse_mode='html')
+        # PRIVATE
+        res, msg_id = get_members_private(data.get('id_training'))
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_private_chat, text=res,
+                                    parse_mode='html')
         this_training = cur.execute('''SELECT * FROM Trainings WHERE id=?''', (data.get('id_training'),)).fetchone()
         now = data.get('date_chosen')
-        res = text_sign_up_successfully + this_training[1] + datetime.strptime(now, '%Y-%m-%d').strftime('%d.%m.%Y') + ' в '
+        res2 = text_sign_up_successfully + this_training[1] + ' ' + datetime.strptime(now, '%Y-%m-%d').strftime('%d.%m.%Y') + ' в '
         morph = pymorphy2.MorphAnalyzer()
         pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
-        res += pm.inflect({'accs'}).word.capitalize() + ' в ' + message.text
+        res2 += pm.inflect({'accs'}).word.capitalize() + ' в ' + data.get('time_training')
         await state.finish()
-        await bot.send_message(message.from_user.id, res,
-                               reply_markup=remove_keyboard)
+        await bot.send_message(message.from_user.id, res2,
+                               reply_markup=remove_keyboard, parse_mode='html')
         if message.from_user.id in admins:
             btns = admin_menu_buttons
         elif message.from_user.id in trainers:
@@ -704,7 +752,9 @@ async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
         res, msg_id = get_members(data.get('id_training'))
         await bot.edit_message_text(message_id=msg_id, chat_id=id_chat, text=res,
                                     parse_mode='html')
-
+        res, msg_id = get_members_private(data.get('id_training'))
+        await bot.edit_message_text(message_id=msg_id, chat_id=id_private_chat, text=res,
+                                    parse_mode='html')
         await state.finish()
         await bot.send_message(message.from_user.id, text_sign_up_tr_successfully)
         await bot.send_message(message.from_user.id, text=text_admin_panel, reply_markup=panel)

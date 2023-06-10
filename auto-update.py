@@ -9,3 +9,5 @@ for i in every:
     if datetime.now() > date:
         cur.execute('''DELETE FROM Trainings WHERE id = ?''', (i[0],))
         con.commit()
+        cur.execute('''DELETE FROM user_to_training WHERE training_id=?''', (i[0],))
+        con.commit()

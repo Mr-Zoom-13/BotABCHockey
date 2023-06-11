@@ -16,6 +16,9 @@ import locale
 import pymorphy2
 
 # Settings for Russian days of week
+# FOR SERVER
+# locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
+# FOR LOCALE
 locale.setlocale(locale.LC_ALL, '')
 
 # Logging for check
@@ -121,9 +124,11 @@ class SignUpTr(StatesGroup):
 def get_members(id_training):
     training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
                            (id_training,)).fetchone()
+    date_time = datetime.strptime(training[2].split()[0], '%Y-%m-%d')
     every = cur.execute('''SELECT * FROM user_to_training WHERE training_id = ?''',
                         (id_training,)).fetchall()
-    res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
+    res = '<b>' + date_time.strftime('%A').capitalize() + '</b> ' + str(training[2]).split(' ')[0] + ' ' + \
+          training[1] + ' ' + ':'.join(
         str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
     for i in range(len(every)):
         res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
@@ -134,9 +139,10 @@ def get_members(id_training):
 def get_members_private(id_training):
     training = cur.execute('''SELECT * FROM Trainings WHERE id = ?''',
                            (id_training,)).fetchone()
+    date_time = datetime.strptime(training[2].split()[0], '%Y-%m-%d')
     every = cur.execute('''SELECT * FROM user_to_training WHERE training_id = ?''',
                         (id_training,)).fetchall()
-    res = str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
+    res = '<b>' + date_time.strftime('%A').capitalize() + '</b> ' + str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
         str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
     for i in range(len(every)):
         res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
@@ -488,10 +494,9 @@ async def date_training_chosen(message: types.Message, state: FSMContext):
         date_time = date_time.replace(year=2023)
 
         # NOTIFICATION
-        morph = pymorphy2.MorphAnalyzer()
-        pm = morph.parse(date_time.strftime('%A'))[0]
-        msg = await bot.send_message(id_chat, '<b>' + pm.inflect({'accs'}).word.capitalize() + '</b> ' + str(date_time).split(' ')[0] + ' <b>' + data[
-            'chosen_type_training'] + '</b> ' + ':'.join(
+        msg = await bot.send_message(id_chat, '<b>' + date_time.strftime('%A').capitalize() + '</b> ' +
+                                     str(date_time).split(' ')[0] + ' <b>' + data[
+                                         'chosen_type_training'] + '</b> ' + ':'.join(
             str(date_time).split(' ')[1].split(':')[:-1]) + '\nУчастники: ', parse_mode='html')
         # PRIVATE
         pr_msg = await bot.send_message(id_private_chat,
@@ -580,6 +585,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             '''SELECT * FROM user_to_training WHERE user_id=? AND training_id=? AND fi = ?''',
             (check[0], this_training[0], check[4])).fetchone()
         if already_exists:
+            await state.update_data(time_training=message.text)
             await state.update_data(id_training=this_training[0])
             await state.set_state(SignUp.waiting_fi.state)
             await bot.send_message(message.from_user.id, text_sign_up_fi)

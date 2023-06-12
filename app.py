@@ -17,9 +17,9 @@ import pymorphy2
 
 # Settings for Russian days of week
 # FOR SERVER
-# locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
+locale.setlocale(locale.LC_ALL, 'ru_RU.utf8')
 # FOR LOCALE
-locale.setlocale(locale.LC_ALL, '')
+# locale.setlocale(locale.LC_ALL, '')
 
 # Logging for check
 logging.basicConfig(level=logging.INFO)
@@ -564,6 +564,18 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
                 break
         await bot.send_message(call.from_user.id, res, reply_markup=menu_numbers,
                                parse_mode='html')
+    else:
+        await bot.send_message(call.from_user.id, text_no_trainings, reply_markup=remove_keyboard,
+                               parse_mode='html')
+        if call.from_user.id in admins:
+            btns = admin_menu_buttons
+        elif call.from_user.id in trainers:
+            btns = trainer_menu_buttons
+        else:
+            btns = menu_buttons
+        await call.message.answer(
+            text_menu_first + call.from_user.first_name + ' ' + call.from_user.last_name + text_menu_second,
+            reply_markup=btns, parse_mode='html')
 
 
 @dp.message_handler(state=SignUp.waiting_number)
@@ -588,7 +600,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             await state.update_data(time_training=message.text)
             await state.update_data(id_training=this_training[0])
             await state.set_state(SignUp.waiting_fi.state)
-            await bot.send_message(message.from_user.id, text_sign_up_fi)
+            await bot.send_message(message.from_user.id, text_sign_up_fi, parse_mode='html')
             return
 
         if check[3]:
@@ -630,7 +642,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
         await state.update_data(id_training=this_training[0])
         await state.set_state(SignUp.waiting_fi.state)
         await bot.send_message(message.from_user.id, text_sign_up_fi,
-                               reply_markup=remove_keyboard)
+                               reply_markup=remove_keyboard, parse_mode='html')
     except ValueError:
         await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
 
@@ -765,7 +777,7 @@ async def sign_up_tr_number_chosen(message: types.Message, state: FSMContext):
             return
         await state.update_data(id_training=id_training)
         await state.set_state(SignUpTr.waiting_fi.state)
-        await bot.send_message(message.from_user.id, text_sign_up_fi)
+        await bot.send_message(message.from_user.id, text_sign_up_fi, parse_mode='html')
     except ValueError:
         await bot.send_message(message.from_user.id, text_admin_delete_training_retry)
 

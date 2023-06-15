@@ -569,6 +569,7 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
         await bot.send_message(call.from_user.id, res, reply_markup=menu_numbers,
                                parse_mode='html')
     else:
+        await state.finish()
         await bot.send_message(call.from_user.id, text_no_trainings,
                                reply_markup=remove_keyboard,
                                parse_mode='html')
@@ -726,13 +727,33 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(text='sign up tr')
 async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await bot.send_message(id_tech_chat, '[' + str(
         call.from_user.id) + '] ' + call.from_user.first_name + ' ' + call.from_user.last_name + ': Администратор начал записывать на тренировку')
     if check_banned(call.from_user.id):
         await bot.send_message(call.from_user.id, text_banned)
         return
-    await state.set_state(SignUpTr.waiting_phone_number.state)
-    await call.message.edit_text(text_sign_up_tr)
+    every = cur.execute('''SELECT * FROM Trainings''').fetchall()
+    if every:
+        await state.set_state(SignUpTr.waiting_phone_number.state)
+        await call.message.edit_text(text_sign_up_tr)
+    else:
+        await state.finish()
+        await bot.send_message(call.from_user.id, text_no_trainings,
+                               reply_markup=remove_keyboard,
+                               parse_mode='html')
+        if call.from_user.id in admins:
+            btns = admin_menu_buttons
+        elif call.from_user.id in trainers:
+            btns = trainer_menu_buttons
+        else:
+            btns = menu_buttons
+        await call.message.answer(
+            text_menu_first + call.from_user.first_name + ' ' + call.from_user.last_name + text_menu_second,
+            reply_markup=btns, parse_mode='html')
 
 
 @dp.message_handler(state=SignUpTr.waiting_phone_number)
@@ -753,27 +774,13 @@ async def sign_up_tr_phone_number_chosen(message: types.Message, state: FSMConte
             menu_numbers = ReplyKeyboardMarkup()
             menu_numbers.add(KeyboardButton('Назад⬅️'))
             every = cur.execute('''SELECT * FROM Trainings''').fetchall()
-            if every:
-                for i in every:
-                    menu_numbers.add(KeyboardButton(str(i[0])))
-                    res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
-                        i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
+            for i in every:
+                menu_numbers.add(KeyboardButton(str(i[0])))
+                res += '<b>#' + str(i[0]) + '</b> ' + str(i[2]).split(' ')[0] + ' ' + str(
+                    i[1]) + ' ' + ':'.join(str(i[2]).split(' ')[1].split(':')[:-1]) + '\n'
 
-                await bot.send_message(message.from_user.id, text_sign_up + ':\n' + res,
-                                       reply_markup=menu_numbers, parse_mode='html')
-            else:
-                await bot.send_message(message.from_user.id, text_no_trainings,
-                                       reply_markup=remove_keyboard,
-                                       parse_mode='html')
-                if message.from_user.id in admins:
-                    btns = admin_menu_buttons
-                elif message.from_user.id in trainers:
-                    btns = trainer_menu_buttons
-                else:
-                    btns = menu_buttons
-                await bot.send_message(message.from_user.id,
-                                       text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
-                                       reply_markup=btns, parse_mode='html')
+            await bot.send_message(message.from_user.id, text_sign_up + ':\n' + res,
+                                   reply_markup=menu_numbers, parse_mode='html')
         else:
             await bot.send_message(message.from_user.id, text_register_retry)
             return

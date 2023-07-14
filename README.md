@@ -1,4 +1,5 @@
 # BotABCHockey
+## About bot
 Commercial bot for Hockey school in Moscow. 
 Allows you to create workouts, track logs, view people's records. Implemented accounts for administrators, coaches and clients
 ## Where can I watch?

@@ -15,6 +15,7 @@ text_admin_refactor_training_type = 'Выберите новый тип трен
 text_admin_refactor_training_date = 'Введите новую дату и время начала тренировки в формате:\n\t23.01 23:59'
 text_admin_refactor_training_retry = 'Введена некорректная цифра колонки, попробуйте снова'
 text_admin_successfully_refactor = 'Тренировка изменена!'
+text_register_input_game_role = "Выберите вашу роль"
 text_register = 'Введите номер <b>ВАШ НОМЕР ТЕЛЕФОНА</b> в формате +71234567890'
 text_register_retry = 'Неверные данные, попробуйте снова'
 text_sign_up = 'Выберите тренировку '

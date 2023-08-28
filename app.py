@@ -87,6 +87,12 @@ button_notifications = InlineKeyboardButton(text='Записаться на тр
                                             url="https://t.me/abchockeybot")
 menu_notifications.add(button_notifications)
 
+# Choose game role
+menu_choose_game_role = ReplyKeyboardMarkup(row_width=1)
+button_choose_goalkeeper = KeyboardButton(text="Вратарь")
+button_choose_field_player = KeyboardButton(text="Полевой игрок")
+menu_choose_game_role.row(button_choose_goalkeeper).row(button_choose_field_player)
+
 
 class AddTraining(StatesGroup):
     waiting_for_type_training = State()
@@ -105,6 +111,7 @@ class RefactorTraining(StatesGroup):
 
 
 class Register(StatesGroup):
+    waiting_game_role = State()
     waiting_phone_number = State()
 
 
@@ -190,8 +197,11 @@ async def start_handler(message: types.Message, state: FSMContext):
     check = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                         (message.from_user.id,)).fetchone()
     if not check:
-        await state.set_state(Register.waiting_phone_number.state)
-        await bot.send_message(message.from_user.id, text_register, parse_mode='html')
+        await state.set_state(Register.waiting_game_role.state)
+        await bot.send_message(message.from_user.id, text_register_input_game_role,
+                               reply_markup=menu_choose_game_role, parse_mode="html")
+        # await state.set_state(Register.waiting_phone_number.state)
+        # await bot.send_message(message.from_user.id, text_register, parse_mode='html')
     else:
         if message.from_user.id in admins:
             btns = admin_menu_buttons
@@ -283,8 +293,19 @@ async def notifications(message: types.Message):
                                parse_mode='html')
 
 
+@dp.message_handler(state=Register.waiting_game_role)
+async def register_input_game_role(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned, parse_mode='html')
+        return
+    game_role = message.text
+    await state.update_data(game_role=game_role)
+    await state.set_state(Register.waiting_phone_number.state)
+    await bot.send_message(message.from_user.id, text_register, parse_mode='html')
+
+
 @dp.message_handler(state=Register.waiting_phone_number)
-async def refactor_training_chosen(message: types.Message, state: FSMContext):
+async def register_user(message: types.Message, state: FSMContext):
     if check_banned(message.from_user.id):
         await bot.send_message(message.from_user.id, text_banned, parse_mode='html')
         return
@@ -295,8 +316,9 @@ async def refactor_training_chosen(message: types.Message, state: FSMContext):
         if carrier._is_mobile(number_type(phonenumbers.parse(check))):
             check = phonenumbers.format_number(phonenumbers.parse(check),
                                                phonenumbers.PhoneNumberFormat.INTERNATIONAL)
-            cur.execute('''INSERT INTO Users(tg_id, phone_number) VALUES (?, ?)''',
-                        (message.from_user.id, check))
+            data = await state.get_data()
+            cur.execute('''INSERT INTO Users(tg_id, phone_number, game_role) VALUES (?, ?, ?)''',
+                        (message.from_user.id, check, data.get("game_role")))
             con.commit()
             await state.finish()
             if message.from_user.id in admins:

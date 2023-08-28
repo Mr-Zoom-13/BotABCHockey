@@ -10,7 +10,7 @@ import logging
 from phonenumbers import carrier
 import phonenumbers
 from phonenumbers.phonenumberutil import number_type
-from datetime import datetime
+from datetime import datetime, timedelta
 import sqlite3
 import locale
 import pymorphy2
@@ -122,6 +122,7 @@ class SignUp(StatesGroup):
 
 
 class SignUpTr(StatesGroup):
+    waiting_game_role = State()
     waiting_number = State()
     waiting_fi = State()
     waiting_born = State()
@@ -139,8 +140,9 @@ def get_members(id_training):
           training[1] + ' ' + ':'.join(
         str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
     for i in range(len(every)):
-        res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
-            0] + '\n'
+        res += str(i + 1) + '. <b>' + every[i][6] + "</b> " + every[i][4] + ', ' + \
+               every[i][3].split(' ')[0].split('-')[
+                   0] + '\n'
     return res, training[3]
 
 
@@ -154,8 +156,9 @@ def get_members_private(id_training):
           str(training[2]).split(' ')[0] + ' ' + training[1] + ' ' + ':'.join(
         str(training[2]).split(' ')[1].split(':')[:-1]) + '\nУчастники:\n'
     for i in range(len(every)):
-        res += str(i + 1) + '. ' + every[i][4] + ', ' + every[i][3].split(' ')[0].split('-')[
-            0] + ', ' + every[i][5] + '\n'
+        res += str(i + 1) + '. <b>' + every[i][6] + "</b> " + every[i][4] + ', ' + \
+               every[i][3].split(' ')[0].split('-')[
+                   0] + ', ' + every[i][5] + '\n'
     return res, training[4]
 
 
@@ -301,7 +304,7 @@ async def register_input_game_role(message: types.Message, state: FSMContext):
     game_role = message.text
     await state.update_data(game_role=game_role)
     await state.set_state(Register.waiting_phone_number.state)
-    await bot.send_message(message.from_user.id, text_register, parse_mode='html')
+    await bot.send_message(message.from_user.id, text_register, reply_markup=remove_keyboard, parse_mode='html')
 
 
 @dp.message_handler(state=Register.waiting_phone_number)
@@ -317,8 +320,9 @@ async def register_user(message: types.Message, state: FSMContext):
             check = phonenumbers.format_number(phonenumbers.parse(check),
                                                phonenumbers.PhoneNumberFormat.INTERNATIONAL)
             data = await state.get_data()
-            cur.execute('''INSERT INTO Users(tg_id, phone_number, game_role) VALUES (?, ?, ?)''',
-                        (message.from_user.id, check, data.get("game_role")))
+            cur.execute(
+                '''INSERT INTO Users(tg_id, phone_number, game_role) VALUES (?, ?, ?)''',
+                (message.from_user.id, check, data.get("game_role")))
             con.commit()
             await state.finish()
             if message.from_user.id in admins:
@@ -614,9 +618,13 @@ async def sign_up(call: types.CallbackQuery, state: FSMContext):
         pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
         res += ' в ' + pm.inflect({'accs'}).word.capitalize() + text_sign_up_2
         for i in every:
-            if i[2].split()[0] == now:
-                menu_numbers.add(KeyboardButton(i[2].split()[1][:-3]))
-                res += i[2].split()[1][:-3] + ' ' + i[1] + '\n'
+            if i[2].split()[0] == now or i[5] == 1:
+                if i[2].split()[0] != now:
+                    menu_numbers.add(KeyboardButton("Завтра: " + i[2].split()[1][:-3]))
+                    res += "Завтра: " + i[2].split()[1][:-3] + ' ' + i[1] + '\n'
+                else:
+                    menu_numbers.add(KeyboardButton(i[2].split()[1][:-3]))
+                    res += i[2].split()[1][:-3] + ' ' + i[1] + '\n'
             else:
                 break
         await bot.send_message(call.from_user.id, res, reply_markup=menu_numbers,
@@ -645,8 +653,16 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
         now = data.get('date_chosen')
-        this_training = cur.execute('''SELECT * FROM Trainings WHERE datetime = ?''',
-                                    (now + ' ' + message.text + ':00',)).fetchone()
+        if "Завтра: " in message.text:
+            now = str(datetime.strptime(now, '%Y-%m-%d') + timedelta(days=1)).split()[0]
+            message_time = " ".join(message.text.split()[1:])
+            this_training = cur.execute('''SELECT * FROM Trainings WHERE datetime = ?''',
+                                        (now + ' ' + message_time + ':00',)).fetchone()
+        else:
+            message_time = message.text
+            this_training = cur.execute('''SELECT * FROM Trainings WHERE datetime = ?''',
+                                        (now + ' ' + message_time + ':00',)).fetchone()
+
         if not this_training:
             await bot.send_message(message.from_user.id, text_admin_delete_training_retry,
                                    parse_mode='html')
@@ -657,7 +673,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
             '''SELECT * FROM user_to_training WHERE user_id=? AND training_id=? AND fi = ?''',
             (check[0], this_training[0], check[4])).fetchone()
         if already_exists:
-            await state.update_data(time_training=message.text)
+            await state.update_data(time_training=message_time)
             await state.update_data(id_training=this_training[0])
             await state.set_state(SignUp.waiting_fi.state)
             await bot.send_message(message.from_user.id, text_sign_up_fi, parse_mode='html')
@@ -665,8 +681,8 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
 
         if check[3]:
             cur.execute(
-                '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
-                (check[0], this_training[0], check[3], check[4], check[2]))
+                '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number, game_role) VALUES (?, ?, ?, ?, ?, ?)''',
+                (check[0], this_training[0], check[3], check[4], check[2], check[5]))
             con.commit()
 
             # NOTIFICATION
@@ -685,7 +701,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
                 '%d.%m.%Y') + ' в '
             morph = pymorphy2.MorphAnalyzer()
             pm = morph.parse(datetime.strptime(now, '%Y-%m-%d').strftime('%A'))[0]
-            res += pm.inflect({'accs'}).word.capitalize() + ' в ' + message.text
+            res += pm.inflect({'accs'}).word.capitalize() + ' в ' + message_time
             await bot.send_message(message.from_user.id, res,
                                    reply_markup=remove_keyboard, parse_mode='html')
             if message.from_user.id in admins:
@@ -698,7 +714,7 @@ async def sign_up_number_chosen(message: types.Message, state: FSMContext):
                                    text_menu_first + message.from_user.first_name + ' ' + message.from_user.last_name + text_menu_second,
                                    parse_mode='html', reply_markup=btns)
             return
-        await state.update_data(time_training=message.text)
+        await state.update_data(time_training=message_time)
         await state.update_data(id_training=this_training[0])
         await state.set_state(SignUp.waiting_fi.state)
         await bot.send_message(message.from_user.id, text_sign_up_fi,
@@ -740,8 +756,8 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
                         (fi, date_time, message.from_user.id))
             con.commit()
         cur.execute(
-            '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
-            (user[0], data.get('id_training'), date_time, fi, user[2]))
+            '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number, game_role) VALUES (?, ?, ?, ?, ?, ?)''',
+            (user[0], data.get('id_training'), date_time, fi, user[2], user[5]))
         con.commit()
 
         # NOTIFICATION
@@ -795,8 +811,9 @@ async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
         return
     every = cur.execute('''SELECT * FROM Trainings''').fetchall()
     if every:
-        await state.set_state(SignUpTr.waiting_phone_number.state)
-        await call.message.answer(text_sign_up_tr, parse_mode='html')
+        await state.set_state(SignUpTr.waiting_game_role.state)
+        await call.message.answer(text_register_input_game_role,
+                                  reply_markup=menu_choose_game_role, parse_mode='html')
     else:
         await state.finish()
         await bot.send_message(call.from_user.id, text_no_trainings,
@@ -811,6 +828,17 @@ async def sign_up_tr(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer(
             text_menu_first + call.from_user.first_name + ' ' + call.from_user.last_name + text_menu_second,
             reply_markup=btns, parse_mode='html')
+
+
+@dp.message_handler(state=SignUpTr.waiting_game_role)
+async def sign_up_tr_game_role_chosen(message: types.Message, state: FSMContext):
+    if check_banned(message.from_user.id):
+        await bot.send_message(message.from_user.id, text_banned, parse_mode='html')
+        return
+    game_role = message.text
+    await state.update_data(game_role=game_role)
+    await state.set_state(SignUpTr.waiting_phone_number.state)
+    await bot.send_message(message.from_user.id, text_sign_up_tr, reply_markup=remove_keyboard)
 
 
 @dp.message_handler(state=SignUpTr.waiting_phone_number)
@@ -880,9 +908,9 @@ async def sign_up_tr_fi_chosen(message: types.Message, state: FSMContext):
         user_id = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                               (message.from_user.id,)).fetchone()[0]
         cur.execute(
-            '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number) VALUES (?, ?, ?, ?, ?)''',
+            '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number, game_role) VALUES (?, ?, ?, ?, ?, ?)''',
             (0, data.get('id_training'), date_time, fi,
-             data.get('phone_number')))
+             data.get('phone_number'), data.get("game_role")))
         con.commit()
 
         # NOTIFICATION

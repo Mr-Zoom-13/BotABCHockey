@@ -731,7 +731,8 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
     try:
         fi = ' '.join(message.text.split()[:2])
         data = await state.get_data()
-        date_time = datetime.strptime(message.text.split()[-1], '%y')
+        date_time = datetime.strptime(message.text.split()[-2], '%y')
+        game_role = message.text.split()[-1]
         user = cur.execute('''SELECT * FROM Users WHERE tg_id = ?''',
                            (message.from_user.id,)).fetchone()
         already_exists = cur.execute(
@@ -757,7 +758,7 @@ async def sign_up_fi_chosen(message: types.Message, state: FSMContext):
             con.commit()
         cur.execute(
             '''INSERT INTO user_to_training(user_id, training_id, birthday, fi, phone_number, game_role) VALUES (?, ?, ?, ?, ?, ?)''',
-            (user[0], data.get('id_training'), date_time, fi, user[2], user[5]))
+            (user[0], data.get('id_training'), date_time, fi, user[2], game_role))
         con.commit()
 
         # NOTIFICATION
